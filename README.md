@@ -14,32 +14,19 @@ El **SAST Automation Engine** no es un simple _linter_ basado en expresiones reg
 |**Precisión**|Alta tasa de Falsos Positivos.|**Alta Fidelidad.** Reduce el ruido al entender la lógica del código.|
 |**Detección**|Solo patrones textuales exactos.|Variaciones semánticas (ej. `x = 1; y = x` es igual a `y = 1`).|
 
-## 2. Inteligencia de Amenazas (Custom Ruleset)
 
-El motor opera con una configuración de reglas personalizada (`ruleset.yml`) diseñada específicamente para mitigar riesgos en arquitecturas **Fintech**.
+### Cobertura de Riesgos (Ruleset Avanzado)
 
-### Cobertura de Riesgos Críticos (Mapeo OWASP/CWE)
+El motor implementa reglas de alta precisión para arquitecturas modernas (Cloud/Microservicios):
 
-1. **Gestión de Secretos (CWE-798):**
-    
-    - Detección de patrones de alta entropía y prefijos de proveedores (AWS `AKIA`, Stripe `sk_live`).
-        
-    - Validación de entropía para detectar claves privadas RSA/PEM.
-        
-2. **Prevención de Inyección (OWASP A03):**
-    
-    - **SQLi:** Identificación de concatenación de cadenas no sanitizadas en drivers de base de datos (Python DB-API, JDBC, Node-PG).
-        
-    - **RCE:** Detección de uso de funciones de ejecución de sistema (`os.system`, `exec`, `eval`) con input no confiable.
-        
-3. **Criptografía y Autenticación (OWASP A02/A07):**
-    
-    - Bloqueo de primitivas criptográficas obsoletas (MD5, SHA1, DES).
-        
-    - Detección de generadores de números aleatorios no seguros (`math.random` vs `crypto.random`).
-        
-    - Validación de configuración JWT (algoritmo `None` prohibido).
-        
+|Categoría|Patrones Detectados|
+|---|---|
+|**Secretos (CWE-798)**|Claves de AWS, Stripe, Slack, Google API y Private Keys (Regex Avanzado).|
+|**Inyección SQL/NoSQL (CWE-89)**|Concatenación insegura en SQL y patrones vulnerables en consultas MongoDB/NoSQL.|
+|**Riesgos Cloud/API (SSRF/XXE)**|Peticiones HTTP con URLs controladas por usuario (SSRF) y parseo XML inseguro (XXE).|
+|**Deserialización (CWE-502)**|Uso peligroso de `pickle`, `yaml.load` o deserializadores que permiten RCE.|
+|**Criptografía (CWE-327)**|Uso de algoritmos obsoletos (MD5, SHA1) y generadores aleatorios débiles.|
+|**Configuración**|Modo `debug=True` en producción y verificación SSL deshabilitada.|
 
 ## 3. Guía de Despliegue y Ejecución
 
@@ -72,6 +59,16 @@ Para entornos donde no se desee instalar Python/Semgrep en el host, utilice la i
 docker run --rm -v "${PWD}:/src" returntocorp/semgrep \
     semgrep scan --config /src/scripts/sast/ruleset.yml --error
 ```
+
+#### 🔴 Caso de Fallo (Bloqueo de Pipeline)
+El motor detiene la ejecución si detecta riesgos críticos.
+
+![Fallo en Terminal - Quality Gate](assets/dast_dirty.png)
+
+#### 🟢 Caso de Éxito (Clean Code)
+Si el código cumple con los estándares, el motor aprueba el paso.
+
+![Código Limpio SAST](assets/dast_clean.png)
 
 ## 4. Integración en Pipeline CI/CD (Quality Gate)
 
@@ -121,7 +118,12 @@ El motor genera evidencia en `./reports/` con formato JSON estándar, compatible
 - **GitLab Security Dashboard**.
     
 - **SonarQube** (vía plugin de importación genérico).
+- 
     
+### Detalle Técnico de Vulnerabilidades
+El reporte incluye la línea de código exacta, la regla violada y la severidad:
+
+![Detalle de Hallazgos SAST](assets/dast_dirty_details1.png)
 
 ### 5.2. Manejo de Falsos Positivos (Triage)
 
@@ -142,5 +144,6 @@ query = "SELECT * FROM fixed_table" # Justificación: Tabla constante, no input 
     
 - **Soporte:** Para reportar reglas rotas o sugerir nuevas detecciones, abra un _Issue_ con la etiqueta `component:sast`.
     
+
 
 **Departamento de Seguridad de Producto | Super App Security Kit**
