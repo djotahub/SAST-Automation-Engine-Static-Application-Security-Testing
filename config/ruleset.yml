@@ -1,0 +1,95 @@
+rules:
+  # ==============================================================================
+  # CATEGORÍA 1: SECRETOS Y CREDENCIALES (CWE-798)
+  # Detecta AWS, Stripe, Slack y Claves Privadas usando Regex de alta fidelidad
+  # ==============================================================================
+  - id: fintech-critical-secrets
+    patterns:
+      - pattern-either:
+          - pattern-regex: "(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}"
+          - pattern-regex: "(sk_live_[0-9a-zA-Z]{24})"
+          - pattern-regex: "xox[baprs]-([0-9a-zA-Z]{10,48})"
+          - pattern-regex: "-----BEGIN\\s+(RSA|EC|DSA|OPENSSH|PRIVATE)\\s+KEY-----"
+    message: "CRITICAL: Secreto de infraestructura o pago hardcodeado detectado. Esto permite acceso inmediato a recursos de producción."
+    languages: [python, javascript, go, java]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-798"
+
+  # ==============================================================================
+  # CATEGORÍA 2: EJECUCIÓN DE CÓDIGO Y COMANDOS (RCE) (CWE-78, CWE-94, CWE-95)
+  # Detecta os.system, subprocess inseguro y el peligroso eval()
+  # ==============================================================================
+  - id: dangerous-rce-execution
+    patterns:
+      - pattern-either:
+          - pattern: os.system(...)
+          - pattern: subprocess.call(..., shell=True)
+          - pattern: subprocess.check_call(..., shell=True)
+          - pattern: subprocess.run(..., shell=True)
+          - pattern: eval(...)
+          - pattern: exec(...)
+    message: "CRITICAL: Ejecución remota de código (RCE) detectada. `eval`, `exec` o `shell=True` permiten a un atacante tomar control total del servidor."
+    languages: [python]
+    severity: ERROR
+    metadata:
+      owasp: "A03:2021-Injection"
+
+  # ==============================================================================
+  # CATEGORÍA 3: INYECCIÓN SQL (CWE-89)
+  # Detecta concatenación (+) y f-strings dentro de llamadas a DB
+  # ==============================================================================
+  - id: sql-injection-detection
+    patterns:
+      - pattern-either:
+          - pattern: $CURSOR.execute("..." + ...)
+          - pattern: $CURSOR.execute(f"...")
+          - pattern: $CURSOR.execute("...".format(...))
+          - pattern: $CURSOR.execute("...%s..." % ...)
+    message: "HIGH: Inyección SQL detectada. Nunca construya consultas SQL concatenando strings. Use consultas parametrizadas (Prepared Statements)."
+    languages: [python]
+    severity: ERROR
+
+  # ==============================================================================
+  # CATEGORÍA 4: DESERIALIZACIÓN INSEGURA (CWE-502)
+  # Detecta pickle y yaml.load que permiten ejecución de código al leer datos
+  # ==============================================================================
+  - id: insecure-deserialization
+    patterns:
+      - pattern-either:
+          - pattern: pickle.load(...)
+          - pattern: pickle.loads(...)
+          - pattern: yaml.load(..., Loader=yaml.Loader)
+          - pattern: yaml.load(...)
+    message: "CRITICAL: Deserialización insegura. `pickle` permite ejecución arbitraria de código al cargar datos maliciosos. Use formatos seguros como JSON."
+    languages: [python]
+    severity: ERROR
+    metadata:
+      owasp: "A08:2021-Software and Data Integrity Failures"
+
+  # ==============================================================================
+  # CATEGORÍA 5: CRIPTOGRAFÍA DÉBIL (CWE-327)
+  # Detecta MD5 y generadores aleatorios no criptográficos
+  # ==============================================================================
+  - id: weak-crypto-usage
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.md5(...)
+          - pattern: hashlib.sha1(...)
+          - pattern: random.random(...)
+    message: "MEDIUM: Uso de criptografía débil (MD5) o aleatoriedad no segura. Use `hashlib.sha256` y `secrets` (o `os.urandom`) para operaciones de seguridad."
+    languages: [python]
+    severity: WARNING
+
+  # ==============================================================================
+  # CATEGORÍA 6: CONFIGURACIÓN INSEGURA (CWE-295, CWE-489)
+  # Detecta SSL deshabilitado y Modo Debug en producción
+  # ==============================================================================
+  - id: insecure-configuration
+    patterns:
+      - pattern-either:
+          - pattern: requests.$METHOD(..., verify=False)
+          - pattern: app.run(..., debug=True)
+    message: "HIGH: Configuración insegura detectada (SSL deshabilitado o Debug activado). Esto expone la aplicación a ataques MitM o fuga de información."
+    languages: [python]
+    severity: ERROR
